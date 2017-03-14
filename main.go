@@ -13,20 +13,6 @@ import (
 	"time"
 )
 
-func worker(urls, out chan string, wg sync.WaitGroup) {
-	defer wg.Done()
-
-	for {
-		url, ok := <-urls
-		if !ok {
-			return
-		}
-		if isListening(url) {
-			out <- url
-		}
-	}
-}
-
 func main() {
 	flag.Parse()
 	path := flag.Arg(0)
@@ -41,7 +27,20 @@ func main() {
 	var wg sync.WaitGroup
 	for i := 0; i < 40; i++ {
 		wg.Add(1)
-		go worker(urls, output, wg)
+
+		go func() {
+			defer wg.Done()
+
+			for {
+				url, ok := <-urls
+				if !ok {
+					return
+				}
+				if isListening(url) {
+					output <- url
+				}
+			}
+		}()
 	}
 
 	// start waiting for output straight away
