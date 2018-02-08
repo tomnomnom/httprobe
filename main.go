@@ -5,7 +5,6 @@ import (
 	"crypto/tls"
 	"flag"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"strings"
@@ -14,59 +13,41 @@ import (
 )
 
 func main() {
+
+	// configure the concurrency flag
+	concurrency := 20
+	flag.IntVar(&concurrency, "c", 20, "Set the concurrency level")
 	flag.Parse()
-	path := flag.Arg(0)
 
 	// we send urls to check on the urls channel,
 	// but only get them on the output channel if
 	// they are accepting connections
 	urls := make(chan string)
-	output := make(chan string)
 
 	// Spin up a bunch of workers
 	var wg sync.WaitGroup
-	for i := 0; i < 40; i++ {
+	for i := 0; i < concurrency; i++ {
 		wg.Add(1)
 
 		go func() {
 			for url := range urls {
 				if isListening(url) {
-					output <- url
+					fmt.Println(url)
 				}
-
 			}
 
 			wg.Done()
 		}()
 	}
 
-	// start waiting for output straight away
-	go func() {
-		// print all of the URLs we get back
-		for url := range output {
-			fmt.Println(url)
-		}
-	}()
-
-	// Open the input file
-	f, err := os.Open(path)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer f.Close()
-
-	sc := bufio.NewScanner(f)
+	// accept domains on stdin
+	sc := bufio.NewScanner(os.Stdin)
 	for sc.Scan() {
 		domain := strings.ToLower(sc.Text())
 
 		// submit http and https versions to be checked
 		urls <- "http://" + domain
 		urls <- "https://" + domain
-		//urls <- "http://" + domain + ":8080"
-		//urls <- "https://" + domain + ":8443"
-		//urls <- "http://" + domain + ":81"
-		//urls <- "http://" + domain + ":591"
-		//urls <- "http://" + domain + ":8008"
 	}
 
 	// once we've sent all the URLs off we can close the
@@ -74,9 +55,13 @@ func main() {
 	// doing and then call 'Done' on the WaitGroup
 	close(urls)
 
+	// check there were no errors reading stdin (unlikely)
+	if err := sc.Err(); err != nil {
+		fmt.Fprintf(os.Stderr, "failed to read input: %s\n", err)
+	}
+
 	// Wait until all the workers have finished
 	wg.Wait()
-	close(output)
 }
 
 func isListening(url string) bool {
@@ -93,8 +78,9 @@ func isListening(url string) bool {
 	client := &http.Client{
 		Transport:     tr,
 		CheckRedirect: re,
-		Timeout:       time.Second * 3,
+		Timeout:       time.Second * 20,
 	}
+
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return false
@@ -104,12 +90,14 @@ func isListening(url string) bool {
 	req.Close = true
 
 	resp, err := client.Do(req)
-	//fmt.Println(err)
+
 	if resp != nil {
 		defer resp.Body.Close()
 	}
+
 	if err != nil {
 		return false
 	}
+
 	return true
 }
