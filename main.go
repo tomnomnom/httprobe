@@ -29,17 +29,14 @@ func main() {
 		wg.Add(1)
 
 		go func() {
-			defer wg.Done()
-
-			for {
-				url, ok := <-urls
-				if !ok {
-					return
-				}
+			for url := range urls {
 				if isListening(url) {
 					output <- url
 				}
+
 			}
+
+			wg.Done()
 		}()
 	}
 
@@ -65,6 +62,11 @@ func main() {
 		// submit http and https versions to be checked
 		urls <- "http://" + domain
 		urls <- "https://" + domain
+		//urls <- "http://" + domain + ":8080"
+		//urls <- "https://" + domain + ":8443"
+		//urls <- "http://" + domain + ":81"
+		//urls <- "http://" + domain + ":591"
+		//urls <- "http://" + domain + ":8008"
 	}
 
 	// once we've sent all the URLs off we can close the
@@ -78,9 +80,12 @@ func main() {
 }
 
 func isListening(url string) bool {
-	tr := &http.Transport{
+	var tr = &http.Transport{
+		MaxIdleConns:    30,
+		IdleConnTimeout: 30 * time.Second,
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}
+
 	re := func(req *http.Request, via []*http.Request) error {
 		return http.ErrUseLastResponse
 	}
@@ -88,9 +93,21 @@ func isListening(url string) bool {
 	client := &http.Client{
 		Transport:     tr,
 		CheckRedirect: re,
-		Timeout:       time.Second * 1,
+		Timeout:       time.Second * 3,
 	}
-	_, err := client.Get(url)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return false
+	}
+
+	req.Header.Add("Connection", "close")
+	req.Close = true
+
+	resp, err := client.Do(req)
+	//fmt.Println(err)
+	if resp != nil {
+		defer resp.Body.Close()
+	}
 	if err != nil {
 		return false
 	}
