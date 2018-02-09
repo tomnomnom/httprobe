@@ -37,7 +37,7 @@ probes with the `-p` flag by specifying a protocol and port pair:
 
 ## Concurrency
 
-You can set the concurrency level with the `-c` flag::
+You can set the concurrency level with the `-c` flag:
 
 ```
 ▶ cat domains.txt | httprobe -c 50
