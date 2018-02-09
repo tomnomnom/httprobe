@@ -12,12 +12,39 @@ import (
 	"time"
 )
 
+type probeArgs []string
+
+func (p *probeArgs) Set(val string) error {
+	*p = append(*p, val)
+	return nil
+}
+
+func (p probeArgs) String() string {
+	return strings.Join(p, ",")
+}
+
 func main() {
 
-	// configure the concurrency flag
-	concurrency := 20
-	flag.IntVar(&concurrency, "c", 20, "Set the concurrency level")
+	// concurrency flag
+	var concurrency int
+	flag.IntVar(&concurrency, "c", 20, "set the concurrency level")
+
+	// probe flags
+	var probes probeArgs
+	flag.Var(&probes, "p", "add additional probe (proto:port)")
+
+	// skip default probes flag
+	var skipDefault bool
+	flag.BoolVar(&skipDefault, "s", false, "skip the default probes (http:80 and https:443)")
+
+	// timeout flag
+	var to int
+	flag.IntVar(&to, "t", 10000, "timeout (milliseconds)")
+
 	flag.Parse()
+
+	// make an actual time.Duration out of the timeout
+	timeout := time.Duration(to * 1000000)
 
 	// we send urls to check on the urls channel,
 	// but only get them on the output channel if
@@ -31,7 +58,7 @@ func main() {
 
 		go func() {
 			for url := range urls {
-				if isListening(url) {
+				if isListening(url, timeout) {
 					fmt.Println(url)
 				}
 			}
@@ -46,8 +73,20 @@ func main() {
 		domain := strings.ToLower(sc.Text())
 
 		// submit http and https versions to be checked
-		urls <- "http://" + domain
-		urls <- "https://" + domain
+		if !skipDefault {
+			urls <- "http://" + domain
+			urls <- "https://" + domain
+		}
+
+		// submit any additional proto:port probes
+		for _, p := range probes {
+			pair := strings.SplitN(p, ":", 2)
+			if len(pair) != 2 {
+				continue
+			}
+
+			urls <- fmt.Sprintf("%s://%s:%s", pair[0], domain, pair[1])
+		}
 	}
 
 	// once we've sent all the URLs off we can close the
@@ -64,10 +103,10 @@ func main() {
 	wg.Wait()
 }
 
-func isListening(url string) bool {
+func isListening(url string, timeout time.Duration) bool {
 	var tr = &http.Transport{
 		MaxIdleConns:    30,
-		IdleConnTimeout: 30 * time.Second,
+		IdleConnTimeout: time.Second * 30,
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}
 
@@ -78,7 +117,7 @@ func isListening(url string) bool {
 	client := &http.Client{
 		Transport:     tr,
 		CheckRedirect: re,
-		Timeout:       time.Second * 20,
+		Timeout:       timeout,
 	}
 
 	req, err := http.NewRequest("GET", url, nil)
