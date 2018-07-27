@@ -41,10 +41,30 @@ func main() {
 	var to int
 	flag.IntVar(&to, "t", 10000, "timeout (milliseconds)")
 
+	// verbose flag
+	var verbose bool
+	flag.BoolVar(&verbose, "v", false, "output errors to stderr")
+
 	flag.Parse()
 
 	// make an actual time.Duration out of the timeout
 	timeout := time.Duration(to * 1000000)
+
+	var tr = &http.Transport{
+		MaxIdleConns:    30,
+		IdleConnTimeout: time.Second,
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+
+	re := func(req *http.Request, via []*http.Request) error {
+		return http.ErrUseLastResponse
+	}
+
+	client := &http.Client{
+		Transport:     tr,
+		CheckRedirect: re,
+		Timeout:       timeout,
+	}
 
 	// we send urls to check on the urls channel,
 	// but only get them on the output channel if
@@ -58,8 +78,13 @@ func main() {
 
 		go func() {
 			for url := range urls {
-				if isListening(url, timeout) {
+				if isListening(client, url) {
 					fmt.Println(url)
+					continue
+				}
+
+				if verbose {
+					fmt.Fprintf(os.Stderr, "failed: %s\n", url)
 				}
 			}
 
@@ -103,22 +128,7 @@ func main() {
 	wg.Wait()
 }
 
-func isListening(url string, timeout time.Duration) bool {
-	var tr = &http.Transport{
-		MaxIdleConns:    30,
-		IdleConnTimeout: time.Second * 30,
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-	}
-
-	re := func(req *http.Request, via []*http.Request) error {
-		return http.ErrUseLastResponse
-	}
-
-	client := &http.Client{
-		Transport:     tr,
-		CheckRedirect: re,
-		Timeout:       timeout,
-	}
+func isListening(client *http.Client, url string) bool {
 
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
