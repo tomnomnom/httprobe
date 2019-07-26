@@ -1,3 +1,6 @@
 domains
 hosts
 httprobe
+*.tgz
+*.zip
+*.exe
