@@ -5,6 +5,8 @@ import (
 	"crypto/tls"
 	"flag"
 	"fmt"
+	"io"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
@@ -161,9 +163,9 @@ func isListening(client *http.Client, url string) bool {
 	req.Close = true
 
 	resp, err := client.Do(req)
-
 	if resp != nil {
-		defer resp.Body.Close()
+		io.Copy(ioutil.Discard, resp.Body)
+		resp.Body.Close()
 	}
 
 	if err != nil {
