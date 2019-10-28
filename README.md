@@ -60,4 +60,17 @@ If you don't want to probe for HTTP on port 80 or HTTPS on port 443, you can use
 ▶ cat domains.txt | httprobe -s -p https:8443
 ```
 
+## Docker
+
+Build the docker container:
+
+```
+▶ docker build -t httprobe .
+```
+
+Run the container, passing the contents of a file into stdin of the process inside the container. `-i` is required to correctly map `stdin` into the container and to the `httprobe` binary.
+
+```
+▶ cat domains.txt | docker run -i httprobe <args>
+```
 
