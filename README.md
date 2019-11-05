@@ -5,7 +5,11 @@ Take a list of domains and probe for working http and https servers.
 ## Install
 
 ```
-▶ go get -u github.com/tomnomnom/httprobe
+▶ apt-get install golang
+▶ git clone https://github.com/tomnomnom/httprobe.git
+▶ cd httprobe/
+▶ go build main.go
+▶ mv main httprobe
 ```
 
 ## Basic Usage
@@ -17,7 +21,7 @@ httprobe accepts line-delimited domains on `stdin`:
 example.com
 example.edu
 example.net
-▶ cat recon/example/domains.txt | httprobe
+▶ cat recon/example/domains.txt | ./httprobe
 http://example.com
 http://example.net
 http://example.edu
@@ -32,7 +36,7 @@ By default httprobe checks for HTTP on port 80 and HTTPS on port 443. You can ad
 probes with the `-p` flag by specifying a protocol and port pair:
 
 ```
-▶ cat domains.txt | httprobe -p http:81 -p https:8443
+▶ cat domains.txt | ./httprobe -p http:81 -p https:8443
 ```
 
 ## Concurrency
@@ -40,7 +44,7 @@ probes with the `-p` flag by specifying a protocol and port pair:
 You can set the concurrency level with the `-c` flag:
 
 ```
-▶ cat domains.txt | httprobe -c 50
+▶ cat domains.txt | ./httprobe -c 50
 ```
 
 ## Timeout
@@ -48,7 +52,7 @@ You can set the concurrency level with the `-c` flag:
 You can change the timeout by using the `-t` flag and specifying a timeout in milliseconds:
 
 ```
-▶ cat domains.txt | httprobe -t 20000
+▶ cat domains.txt | ./httprobe -t 20000
 ```
 
 ## Skipping Default Probes
@@ -57,7 +61,7 @@ If you don't want to probe for HTTP on port 80 or HTTPS on port 443, you can use
 `-s` flag. You'll need to specify the probes you do want using the `-p` flag:
 
 ```
-▶ cat domains.txt | httprobe -s -p https:8443
+▶ cat domains.txt | ./httprobe -s -p https:8443
 ```
 
 ## Docker
