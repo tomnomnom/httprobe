@@ -60,6 +60,14 @@ If you don't want to probe for HTTP on port 80 or HTTPS on port 443, you can use
 ▶ cat domains.txt | httprobe -s -p https:8443
 ```
 
+## Prefer HTTPS
+
+Sometimes you don't care about checking HTTP if HTTPS is working. You can do that with the `--prefer-https` flag:
+
+```
+▶ cat domains.txt | httprobe --prefer-https
+```
+
 ## Docker
 
 Build the docker container:

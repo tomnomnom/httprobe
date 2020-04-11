@@ -30,7 +30,7 @@ func main() {
 
 	// concurrency flag
 	var concurrency int
-	flag.IntVar(&concurrency, "c", 20, "set the concurrency level")
+	flag.IntVar(&concurrency, "c", 20, "set the concurrency level (split equally between HTTPS and HTTP requests)")
 
 	// probe flags
 	var probes probeArgs
@@ -44,9 +44,13 @@ func main() {
 	var to int
 	flag.IntVar(&to, "t", 10000, "timeout (milliseconds)")
 
-	// verbose flag
-	var verbose bool
-	flag.BoolVar(&verbose, "v", false, "output errors to stderr")
+	// prefer https
+	var preferHTTPS bool
+	flag.BoolVar(&preferHTTPS, "prefer-https", false, "only try plain HTTP if HTTPS fails")
+
+	// HTTP method to use
+	var method string
+	flag.StringVar(&method, "method", "GET", "HTTP method to use")
 
 	flag.Parse()
 
@@ -74,41 +78,88 @@ func main() {
 		Timeout:       timeout,
 	}
 
-	// we send urls to check on the urls channel,
-	// but only get them on the output channel if
-	// they are accepting connections
-	urls := make(chan string)
+	// domain/port pairs are initially sent on the httpsURLs channel.
+	// If they are listening and the --prefer-https flag is set then
+	// no HTTP check is performed; otherwise they're put onto the httpURLs
+	// channel for an HTTP check.
+	httpsURLs := make(chan string)
+	httpURLs := make(chan string)
+	output := make(chan string)
 
-	// Spin up a bunch of workers
-	var wg sync.WaitGroup
-	for i := 0; i < concurrency; i++ {
-		wg.Add(1)
+	// HTTPS workers
+	var httpsWG sync.WaitGroup
+	for i := 0; i < concurrency/2; i++ {
+		httpsWG.Add(1)
 
 		go func() {
-			for url := range urls {
-				if isListening(client, url) {
-					fmt.Println(url)
-					continue
+			for url := range httpsURLs {
+
+				// always try HTTPS first
+				withProto := "https://" + url
+				if isListening(client, withProto, method) {
+					output <- withProto
+
+					// skip trying HTTP if --prefer-https is set
+					if preferHTTPS {
+						continue
+					}
 				}
 
-				if verbose {
-					fmt.Fprintf(os.Stderr, "failed: %s\n", url)
+				httpURLs <- url
+			}
+
+			httpsWG.Done()
+		}()
+	}
+
+	// HTTP workers
+	var httpWG sync.WaitGroup
+	for i := 0; i < concurrency/2; i++ {
+		httpWG.Add(1)
+
+		go func() {
+			for url := range httpURLs {
+				withProto := "http://" + url
+				if isListening(client, withProto, method) {
+					output <- withProto
+					continue
 				}
 			}
 
-			wg.Done()
+			httpWG.Done()
 		}()
 	}
+
+	// Close the httpURLs channel when the HTTPS workers are done
+	go func() {
+		httpsWG.Wait()
+		close(httpURLs)
+	}()
+
+	// Output worker
+	var outputWG sync.WaitGroup
+	outputWG.Add(1)
+	go func() {
+		for o := range output {
+			fmt.Println(o)
+		}
+		outputWG.Done()
+	}()
+
+	// Close the output channel when the HTTP workers are done
+	go func() {
+		httpWG.Wait()
+		close(output)
+	}()
 
 	// accept domains on stdin
 	sc := bufio.NewScanner(os.Stdin)
 	for sc.Scan() {
 		domain := strings.ToLower(sc.Text())
 
-		// submit http and https versions to be checked
+		// submit standard port checks
 		if !skipDefault {
-			urls <- "http://" + domain
-			urls <- "https://" + domain
+			httpsURLs <- domain
 		}
 
 		// Adding port templates
@@ -120,41 +171,48 @@ func main() {
 			switch p {
 			case "xlarge":
 				for _, port := range xlarge {
-					urls <- fmt.Sprintf("http://%s:%s", domain, port)
-					urls <- fmt.Sprintf("https://%s:%s", domain, port)
+					httpsURLs <- fmt.Sprintf("%s:%s", domain, port)
 				}
 			case "large":
 				for _, port := range large {
-					urls <- fmt.Sprintf("http://%s:%s", domain, port)
-					urls <- fmt.Sprintf("https://%s:%s", domain, port)
+					httpsURLs <- fmt.Sprintf("%s:%s", domain, port)
 				}
 			default:
 				pair := strings.SplitN(p, ":", 2)
 				if len(pair) != 2 {
 					continue
 				}
-				urls <- fmt.Sprintf("%s://%s:%s", pair[0], domain, pair[1])
+
+				// This is a little bit funny as "https" will imply an
+				// http check as well unless the --prefer-https flag is
+				// set. On balance I don't think that's *such* a bad thing
+				// but it is maybe a little unexpected.
+				if strings.ToLower(pair[0]) == "https" {
+					httpsURLs <- fmt.Sprintf("%s:%s", domain, pair[1])
+				} else {
+					httpURLs <- fmt.Sprintf("%s:%s", domain, pair[1])
+				}
 			}
 		}
 	}
 
 	// once we've sent all the URLs off we can close the
-	// input channel. The workers will finish what they're
+	// input/httpsURLs channel. The workers will finish what they're
 	// doing and then call 'Done' on the WaitGroup
-	close(urls)
+	close(httpsURLs)
 
 	// check there were no errors reading stdin (unlikely)
 	if err := sc.Err(); err != nil {
 		fmt.Fprintf(os.Stderr, "failed to read input: %s\n", err)
 	}
 
-	// Wait until all the workers have finished
-	wg.Wait()
+	// Wait until the output waitgroup is done
+	outputWG.Wait()
 }
 
-func isListening(client *http.Client, url string) bool {
+func isListening(client *http.Client, url, method string) bool {
 
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequest(method, url, nil)
 	if err != nil {
 		return false
 	}
