@@ -66,6 +66,7 @@ func main() {
 			Timeout:   timeout,
 			KeepAlive: time.Second,
 		}).DialContext,
+		Proxy:             http.ProxyFromEnvironment,
 	}
 
 	re := func(req *http.Request, via []*http.Request) error {
