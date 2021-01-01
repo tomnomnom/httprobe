@@ -168,6 +168,11 @@ func main() {
 	for sc.Scan() {
 		domain := strings.ToLower(sc.Text())
 
+		// Skip unresolvable domains
+		if _, err := net.LookupIP(domain); err != nil {
+			continue
+		}
+
 		// submit standard port checks
 		if !skipDefault {
 			httpsURLs <- domain
