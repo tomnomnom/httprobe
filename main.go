@@ -95,7 +95,15 @@ func main() {
 			for url := range httpsURLs {
 
 				// always try HTTPS first
-				withProto := "https://" + url
+				var withProto string
+				// figure out if url has protocol, if not prepend the protocol
+				if url[0:8] == "https://" {
+					withProto = url
+				} else if url[0:7] == "http://" {
+					withProto = url
+				} else {
+					withProto = "https://" + url
+				}
 				if isListening(client, withProto, method) {
 					output <- withProto
 
@@ -119,7 +127,16 @@ func main() {
 
 		go func() {
 			for url := range httpURLs {
-				withProto := "http://" + url
+
+				var withProto string
+				// figure out if url has protocol, if not prepend protocol
+				if url[0:8] == "https://" {
+					withProto = url
+				} else if url[0:7] == "http://" {
+					withProto = url
+				} else {
+					withProto = "https://" + url
+				}
 				if isListening(client, withProto, method) {
 					output <- withProto
 					continue
