@@ -28,15 +28,15 @@ func (p probeArgs) String() string {
 
 func main() {
 
-	// concurrency flag
+	
 	var concurrency int
 	flag.IntVar(&concurrency, "c", 20, "set the concurrency level (split equally between HTTPS and HTTP requests)")
 
-	// probe flags
+	
 	var probes probeArgs
 	flag.Var(&probes, "p", "add additional probe (proto:port)")
 
-	// skip default probes flag
+	
 	var skipDefault bool
 	flag.BoolVar(&skipDefault, "s", false, "skip the default probes (http:80 and https:443)")
 
@@ -44,7 +44,7 @@ func main() {
 	var to int
 	flag.IntVar(&to, "t", 10000, "timeout (milliseconds)")
 
-	// prefer https
+	
 	var preferHTTPS bool
 	flag.BoolVar(&preferHTTPS, "prefer-https", false, "only try plain HTTP if HTTPS fails")
 
