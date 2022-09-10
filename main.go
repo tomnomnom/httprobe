@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"strconv"
 	"sync"
 	"time"
 )
@@ -51,6 +52,10 @@ func main() {
 	// HTTP method to use
 	var method string
 	flag.StringVar(&method, "method", "GET", "HTTP method to use")
+
+	// Filter status code
+	var statusCodes string
+	flag.StringVar(&statusCodes, "status-codes", "", "Status codes to display.")
 
 	flag.Parse()
 
@@ -96,7 +101,7 @@ func main() {
 
 				// always try HTTPS first
 				withProto := "https://" + url
-				if isListening(client, withProto, method) {
+				if isListening(client, withProto, method, statusCodes) {
 					output <- withProto
 
 					// skip trying HTTP if --prefer-https is set
@@ -120,7 +125,7 @@ func main() {
 		go func() {
 			for url := range httpURLs {
 				withProto := "http://" + url
-				if isListening(client, withProto, method) {
+				if isListening(client, withProto, method, statusCodes) {
 					output <- withProto
 					continue
 				}
@@ -210,7 +215,7 @@ func main() {
 	outputWG.Wait()
 }
 
-func isListening(client *http.Client, url, method string) bool {
+func isListening(client *http.Client, url, method string, statusCodes string) bool {
 
 	req, err := http.NewRequest(method, url, nil)
 	if err != nil {
@@ -226,7 +231,7 @@ func isListening(client *http.Client, url, method string) bool {
 		resp.Body.Close()
 	}
 
-	if err != nil {
+	if err != nil || !strings.Contains(statusCodes, strconv.Itoa(resp.StatusCode)) && statusCodes != "" {
 		return false
 	}
 
