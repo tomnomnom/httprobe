@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -24,6 +25,23 @@ func (p *probeArgs) Set(val string) error {
 
 func (p probeArgs) String() string {
 	return strings.Join(p, ",")
+}
+
+type statusCodes []int
+
+func (p *statusCodes) Set(val string) error {
+	code, err := strconv.Atoi(val)
+	*p = append(*p, code)
+	return err
+}
+
+func (p statusCodes) String() string {
+	codes := ""
+	for _, v := range p {
+		codes += strconv.Itoa(v)
+		codes += " "
+	}
+	return codes
 }
 
 func main() {
@@ -52,6 +70,14 @@ func main() {
 	var method string
 	flag.StringVar(&method, "method", "GET", "HTTP method to use")
 
+	// filtered status codes
+	var statusCodes statusCodes
+	flag.Var(&statusCodes, "f", "filter status codes")
+
+	// follow redirects
+	var followRedirects bool
+	flag.BoolVar(&followRedirects, "follow-redirect", false, "follow redirects")
+
 	flag.Parse()
 
 	// make an actual time.Duration out of the timeout
@@ -78,6 +104,10 @@ func main() {
 		Timeout:       timeout,
 	}
 
+	if followRedirects {
+		client.CheckRedirect = nil
+	}
+
 	// domain/port pairs are initially sent on the httpsURLs channel.
 	// If they are listening and the --prefer-https flag is set then
 	// no HTTP check is performed; otherwise they're put onto the httpURLs
@@ -96,8 +126,9 @@ func main() {
 
 				// always try HTTPS first
 				withProto := "https://" + url
-				if isListening(client, withProto, method) {
-					output <- withProto
+				isOpen, lastUrl := isListening(client, withProto, method, statusCodes)
+				if isOpen {
+					output <- lastUrl
 
 					// skip trying HTTP if --prefer-https is set
 					if preferHTTPS {
@@ -120,8 +151,9 @@ func main() {
 		go func() {
 			for url := range httpURLs {
 				withProto := "http://" + url
-				if isListening(client, withProto, method) {
-					output <- withProto
+				isOpen, lastUrl := isListening(client, withProto, method, statusCodes)
+				if isOpen {
+					output <- lastUrl
 					continue
 				}
 			}
@@ -210,11 +242,11 @@ func main() {
 	outputWG.Wait()
 }
 
-func isListening(client *http.Client, url, method string) bool {
+func isListening(client *http.Client, url, method string, statusCodes statusCodes) (bool, string) {
 
 	req, err := http.NewRequest(method, url, nil)
 	if err != nil {
-		return false
+		return false, url
 	}
 
 	req.Header.Add("Connection", "close")
@@ -227,8 +259,15 @@ func isListening(client *http.Client, url, method string) bool {
 	}
 
 	if err != nil {
-		return false
+		return false, url
 	}
 
-	return true
+	for _, sc := range statusCodes {
+		if sc == resp.StatusCode {
+			return false, url
+		}
+	}
+
+	// In case any redirection was followed returns the last url accessed
+	return true, resp.Request.URL.String()
 }

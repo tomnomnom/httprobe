@@ -68,6 +68,23 @@ Sometimes you don't care about checking HTTP if HTTPS is working. You can do tha
 ▶ cat domains.txt | httprobe --prefer-https
 ```
 
+## Filter HTTP status codes
+
+If you don't want to display websites that return certain HTTP status codes, you can use the `-f` flag followed by the given status code:
+
+```
+▶ cat domains.txt | httprobe -f 404
+```
+
+## Follow redirects
+
+In case you want to apply a filter based on status code, you may also want to follow redirects to determine the final status code:
+
+```
+▶ cat domains.txt | httprobe --follow-redirect
+```
+
+
 ## Docker
 
 Build the docker container:
