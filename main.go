@@ -4,9 +4,9 @@ import (
 	"bufio"
 	"crypto/tls"
 	"flag"
-	"fmt"
 	"io"
 	"io/ioutil"
+	"fmt"
 	"net"
 	"net/http"
 	"os"
@@ -47,6 +47,10 @@ func main() {
 	// prefer https
 	var preferHTTPS bool
 	flag.BoolVar(&preferHTTPS, "prefer-https", false, "only try plain HTTP if HTTPS fails")
+
+	// show status codes
+	var showStatusCodes bool
+	flag.BoolVar(&showStatusCodes, "status-codes", false, "show status codes in output")
 
 	// HTTP method to use
 	var method string
@@ -96,8 +100,13 @@ func main() {
 
 				// always try HTTPS first
 				withProto := "https://" + url
-				if isListening(client, withProto, method) {
-					output <- withProto
+				if code, ok := isListening(client, withProto, method); ok {
+					if showStatusCodes {
+						output <- fmt.Sprintf("%d %s", code, withProto)
+					} else {
+						output <- withProto
+					}
+
 
 					// skip trying HTTP if --prefer-https is set
 					if preferHTTPS {
@@ -120,8 +129,12 @@ func main() {
 		go func() {
 			for url := range httpURLs {
 				withProto := "http://" + url
-				if isListening(client, withProto, method) {
-					output <- withProto
+				if code, ok := isListening(client, withProto, method); ok {
+					if showStatusCodes {
+						output <- fmt.Sprintf("%d %s", code, withProto)
+					} else {
+						output <- withProto
+					}
 					continue
 				}
 			}
@@ -210,11 +223,10 @@ func main() {
 	outputWG.Wait()
 }
 
-func isListening(client *http.Client, url, method string) bool {
-
+func isListening(client *http.Client, url string, method string) (int, bool) {
 	req, err := http.NewRequest(method, url, nil)
 	if err != nil {
-		return false
+		return 0, false
 	}
 
 	req.Header.Add("Connection", "close")
@@ -224,11 +236,8 @@ func isListening(client *http.Client, url, method string) bool {
 	if resp != nil {
 		io.Copy(ioutil.Discard, resp.Body)
 		resp.Body.Close()
+		return resp.StatusCode, true
 	}
 
-	if err != nil {
-		return false
-	}
-
-	return true
+	return 0, false
 }
