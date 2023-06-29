@@ -179,7 +179,7 @@ func main() {
 					httpsURLs <- fmt.Sprintf("%s:%s", domain, port)
 				}
 			case "custom":
-				for _, port := range large {
+				for _, port := range custom {
 					httpsURLs <- fmt.Sprintf("%s:%s", domain, port)
 				}
 			default:
