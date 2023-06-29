@@ -5,7 +5,7 @@ Take a list of domains and probe for working http and https servers.
 ## Install
 
 ```
-▶ go install github.com/gilsgil/httprobe@custom
+go install github.com/gilsgil/httprobe@custom
 ```
 
 ## Basic Usage
@@ -13,11 +13,11 @@ Take a list of domains and probe for working http and https servers.
 httprobe accepts line-delimited domains on `stdin`:
 
 ```
-▶ cat recon/example/domains.txt
+cat recon/example/domains.txt
 example.com
 example.edu
 example.net
-▶ cat recon/example/domains.txt | httprobe
+cat recon/example/domains.txt | httprobe
 http://example.com
 http://example.net
 http://example.edu
@@ -32,7 +32,7 @@ By default httprobe checks for HTTP on port 80 and HTTPS on port 443. You can ad
 probes with the `-p` flag by specifying a protocol and port pair:
 
 ```
-▶ cat domains.txt | httprobe -p http:81 -p https:8443
+cat domains.txt | httprobe -p http:81 -p https:8443
 ```
 
 ## Concurrency
@@ -40,7 +40,7 @@ probes with the `-p` flag by specifying a protocol and port pair:
 You can set the concurrency level with the `-c` flag:
 
 ```
-▶ cat domains.txt | httprobe -c 50
+cat domains.txt | httprobe -c 50
 ```
 
 ## Timeout
@@ -48,7 +48,7 @@ You can set the concurrency level with the `-c` flag:
 You can change the timeout by using the `-t` flag and specifying a timeout in milliseconds:
 
 ```
-▶ cat domains.txt | httprobe -t 20000
+cat domains.txt | httprobe -t 20000
 ```
 
 ## Skipping Default Probes
@@ -57,7 +57,7 @@ If you don't want to probe for HTTP on port 80 or HTTPS on port 443, you can use
 `-s` flag. You'll need to specify the probes you do want using the `-p` flag:
 
 ```
-▶ cat domains.txt | httprobe -s -p https:8443
+cat domains.txt | httprobe -s -p https:8443
 ```
 
 ## Prefer HTTPS
@@ -65,7 +65,7 @@ If you don't want to probe for HTTP on port 80 or HTTPS on port 443, you can use
 Sometimes you don't care about checking HTTP if HTTPS is working. You can do that with the `--prefer-https` flag:
 
 ```
-▶ cat domains.txt | httprobe --prefer-https
+cat domains.txt | httprobe --prefer-https
 ```
 
 ## Docker
@@ -73,12 +73,12 @@ Sometimes you don't care about checking HTTP if HTTPS is working. You can do tha
 Build the docker container:
 
 ```
-▶ docker build -t httprobe .
+docker build -t httprobe .
 ```
 
 Run the container, passing the contents of a file into stdin of the process inside the container. `-i` is required to correctly map `stdin` into the container and to the `httprobe` binary.
 
 ```
-▶ cat domains.txt | docker run -i httprobe <args>
+cat domains.txt | docker run -i httprobe <args>
 ```
 
