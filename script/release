@@ -3,7 +3,7 @@ PROJDIR=$(cd `dirname $0`/.. && pwd)
 
 VERSION="${1}"
 TAG="v${VERSION}"
-USER="tomnomnom"
+USER="gilsgil"
 REPO="httprobe"
 BINARY="${REPO}"
 
