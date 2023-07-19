@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"log"
 	"strings"
 	"sync"
 	"time"
@@ -35,6 +36,10 @@ func main() {
 	// probe flags
 	var probes probeArgs
 	flag.Var(&probes, "p", "add additional probe (proto:port)")
+
+	// custom probe location flag
+        var customPath string
+        flag.StringVar(&customPath, "l", "" ,"Path to the custom port list file")
 
 	// skip default probes flag
 	var skipDefault bool
@@ -177,6 +182,29 @@ func main() {
 				for _, port := range large {
 					httpsURLs <- fmt.Sprintf("%s:%s", domain, port)
 				}
+            		case "custom":
+	            		if customPath != "" {
+		           		if _, err := os.Stat(customPath); err == nil {
+			          		file, err := os.Open(customPath)
+			          		if err != nil {
+				         		log.Printf("Error opening file: %s , did you provide a file path on the -l flag?", err)
+				         	break
+			          		}
+				          	defer file.Close()
+				          	scanner := bufio.NewScanner(file)
+				          	for scanner.Scan() {
+					        	port := scanner.Text()
+					         	httpsURLs <- fmt.Sprintf("%s:%s", domain, port)
+				          	}
+				          	if err := scanner.Err(); err != nil {
+				        		log.Printf("Error reading file: %s", err)
+				          	}
+		         		} else {
+			         		log.Printf("Custom file %s not found.", customPath)
+		         		}
+	         		} else {
+		        		log.Println("Custom file path is not provided.")
+	         		}			
 			default:
 				pair := strings.SplitN(p, ":", 2)
 				if len(pair) != 2 {
